@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% set p = data.profile %}
+{% set recs = data.recommendation %}
+
+{% block title %}{{ tr('page.suggested') }} · Tariff Advisor{% endblock %}
+
+{% block content %}
+<section class="page-head">
+  <h1>{{ tr('page.suggested') }}</h1>
+  <p class="muted">
+    {{ tr('recs.lede', window=(recs.window_start ~ ' → ' ~ recs.window_end) if recs else '3') }}
+  </p>
+</section>
+
+{% if not recs %}
+<div class="empty-state">
+  <p><strong>{{ tr('recs.empty_title') }}</strong></p>
+  <p class="muted">{{ tr('recs.empty_1') }} <code>python scripts/generate_recommendations.py</code> {{ tr('recs.empty_2') }}</p>
+</div>
+{% else %}
+
+{# ---------- ranked cards ---------- #}
+<section class="ranked-list" aria-label="{{ tr('recs.aria_ranked') }}">
+  {% for plan in recs.ranked[:3] %}
+  {% set ep = recs.explanation.per_plan[loop.index0] if recs.explanation.per_plan|length > loop.index0 else None %}
+  <article class="rank-card {% if plan.is_current %}is-current{% endif %}" id="plan-{{ loop.index }}">
+    <header class="rank-head">
+      <div class="sug-badges">
+        {% if loop.index == 1 and plan.is_current %}
+        <span class="pill pill-best">{{ tr('pill.best_keep') }}</span>
+        {% elif loop.index == 1 %}
+        <span class="pill pill-best">{{ tr('pill.top') }}</span>
+        {% else %}
+        <span class="pill pill-rank">#{{ loop.index }}</span>
+        {% endif %}
+        {% if plan.is_current %}<span class="pill pill-current">{{ tr('pill.current') }}</span>{% endif %}
+        {% if plan.shortfall %}<span class="pill pill-warn">{{ tr('pill.shortfall', v=plan.shortfall) }}</span>{% endif %}
+      </div>
+      <h2>{{ plan.name }}</h2>
+      <p class="sug-price"><strong>{{ '%g'|format(plan.price_azn) }} ₼</strong><span>{{ tr('unit.per_month') }}</span>
+        {% if plan.facts.cost_diff_vs_current_azn is defined and plan.facts.cost_diff_vs_current_azn is not none %}
+        <span class="price-diff {{ 'good' if plan.facts.cost_diff_vs_current_azn < 0 else 'bad' }}">
+          ({{ '%+.2f'|format(plan.facts.cost_diff_vs_current_azn) }} ₼ {{ tr('recs.vs_current') }})
+        </span>
+        {% endif %}
+      </p>
+    </header>
+
+    <dl class="spec-grid">
+      <div><dt>{{ tr('spec.internet') }}</dt><dd>{{ '%g'|format(plan.data_gb) ~ ' GB' if plan.data_gb is not none else tr('common.unknown') }}</dd></div>
+      <div><dt>{{ tr('spec.calls') }}</dt><dd>
+        {% if plan.facts.plan_total_min is not none %}{{ '%g'|format(plan.facts.plan_total_min) }} min
+        {% if plan.allnet_min %}{{ tr('spec.any_net') }}{% else %}{{ tr('spec.onoff_net') }}{% endif %}
+        {% else %}{{ tr('common.unknown') }}{% endif %}
+      </dd></div>
+      <div><dt>{{ tr('spec.sms') }}</dt><dd>{{ '%g'|format(plan.sms) if plan.sms is not none else tr('common.unknown') }}</dd></div>
+      <div><dt>{{ tr('spec.est_cost') }}</dt><dd>{{ ('%g'|format(plan.est_total_cost) ~ ' ₼') if plan.est_total_cost is not none else tr('common.unknown') }}</dd></div>
+      <div><dt>{{ tr('spec.unlimited') }}</dt><dd>
+        {% if plan.unlimited_apps and plan.unlimited_apps != 'Yoxdur' %}{{ plan.unlimited_apps }}
+        {% elif plan.unlimited_apps == 'Yoxdur' %}{{ tr('spec.none_listed') }}
+        {% else %}{{ tr('common.unknown') }}{% endif %}
+      </dd></div>
+      <div><dt>{{ tr('spec.score') }}</dt><dd>{{ '%.3f'|format(plan.score) if plan.score is not none else 'n/a' }}</dd></div>
+    </dl>
+
+    {% if ep %}
+    <p class="rank-text">{{ ep.text }}</p>
+    <ul class="fact-list">
+      {% for b in ep.bullets %}<li>{{ b }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
+    <details class="score-details">
+      <summary>{{ tr('recs.score_components') }}</summary>
+      <table class="mini-table">
+        <tr><th>{{ tr('recs.component') }}</th><th>{{ tr('recs.value') }}</th></tr>
+        {% for k, v in plan.components.items() %}
+        <tr><td>{{ k }}</td><td>{{ '%.3f'|format(v) if v is not none else tr('recs.unknown_excluded') }}</td></tr>
+        {% endfor %}
+      </table>
+      <p class="footnote">{{ tr('recs.weights_label') }} {{ recs.weights }}</p>
+    </details>
+
+    <div class="rank-actions">
+      {% if plan.is_current %}
+      <span class="pill pill-current">{{ tr('pill.your_current') }}</span>
+      {% else %}
+      <form method="post" action="{{ url_for('customer.change_tariff') }}" class="inline-form"
+            onsubmit="return confirm('{{ tr('action.switch_confirm', name=plan.name) }}');">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <input type="hidden" name="tariff" value="{{ plan.name }}">
+        <button class="btn btn-primary btn-block" type="submit">{{ tr('action.switch_to', name=plan.name) }}</button>
+      </form>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</section>
+
+{# ---------- comparison table ---------- #}
+<section class="compare" id="compare" aria-labelledby="compare-title">
+  <h2 id="compare-title">{{ tr('recs.compare_title') }}</h2>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">{{ tr('th.plan') }}</th>
+          <th scope="col">{{ tr('th.price') }}</th>
+          <th scope="col">{{ tr('spec.est_cost') }}</th>
+          <th scope="col">{{ tr('recs.your_usage') }}</th>
+          <th scope="col">{{ tr('recs.allowance') }}</th>
+          <th scope="col">{{ tr('recs.extra_cost') }}</th>
+          <th scope="col">{{ tr('recs.price_vs_current') }}</th>
+          <th scope="col">{{ tr('recs.tradeoff') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in comparison %}
+        <tr class="{{ 'row-current' if row.plan.is_current }}">
+          <th scope="row">
+            {{ row.plan.name }}
+            {% if row.plan.is_current %}<span class="pill pill-current">{{ tr('pill.current') }}</span>{% endif %}
+          </th>
+          <td>{{ '%g'|format(row.price) ~ ' ₼' if row.price is not none else tr('common.unknown') }}</td>
+          <td>{{ '%g'|format(row.est_total_cost) ~ ' ₼' if row.est_total_cost is not none else tr('common.unknown') }}</td>
+          <td>
+            {{ '%g'|format(row.used_data) ~ ' GB' if row.used_data is not none else '?' }} /
+            {{ '%g'|format(row.used_minutes) ~ ' min' if row.used_minutes is not none else '?' }}
+          </td>
+          <td>
+            {{ '%g'|format(row.allowance_data) ~ ' GB' if row.allowance_data is not none else tr('common.unknown') }} /
+            {{ '%g'|format(row.allowance_minutes) ~ ' min' if row.allowance_minutes is not none else tr('common.unknown') }}
+          </td>
+          <td>{{ ('%g'|format(row.extra_cost) ~ ' ₼') if row.extra_cost is not none else tr('common.unknown') }}</td>
+          <td>
+            {% if row.plan.is_current %}—
+            {% elif row.price_diff_vs_current is not none %}
+              {{ '%+.2f'|format(row.price_diff_vs_current) }} ₼
+            {% else %}{{ tr('common.unknown') }}{% endif %}
+          </td>
+          <td class="tradeoff">
+            {% for t in row.tradeoffs %}<div>{{ t }}</div>{% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="footnote">{{ recs.explanation.disclaimer }}</p>
+  <p class="footnote">{{ tr('recs.assume_1') }} {{ recs.window_start }} → {{ recs.window_end }}{{ tr('recs.assume_2') }}
+    <strong>{{ tr('recs.assume_strong') }}</strong>{{ tr('recs.assume_3') }}</p>
+</section>
+{% endif %}
+
+{# ---------- change tariff (always rendered) ---------- #}
+<section class="compare" id="change" aria-labelledby="change-title">
+  <h2 id="change-title">{{ tr('recs.change_title') }}</h2>
+  <p class="muted">{{ tr('recs.change_lede') }}</p>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">{{ tr('th.plan') }}</th>
+          <th scope="col">{{ tr('th.price') }}</th>
+          <th scope="col">{{ tr('th.internet_gb') }}</th>
+          <th scope="col">{{ tr('th.minutes') }}</th>
+          <th scope="col">{{ tr('th.sms') }}</th>
+          <th scope="col">{{ tr('th.action') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in catalog %}
+        <tr class="{{ 'row-current' if t.name == current_tariff }}">
+          <th scope="row">
+            {{ t.name }}
+            {% if t.name == current_tariff %}<span class="pill pill-current">{{ tr('pill.current') }}</span>{% endif %}
+          </th>
+          <td>{{ '%g'|format(t.price_azn) ~ ' ₼' if t.price_azn is not none else tr('common.unknown') }}</td>
+          <td>{{ '%g'|format(t.data_gb) ~ ' GB' if t.data_gb is not none else tr('common.unknown') }}</td>
+          <td>
+            {% if t.allnet_min %}{{ '%g'|format(t.allnet_min) }} min {{ tr('spec.any_net') }}
+            {% elif t.onnet_min or t.offnet_min %}
+              {{ '%g'|format((t.onnet_min or 0) + (t.offnet_min or 0)) }} min {{ tr('spec.onoff_net') }}
+            {% else %}{{ tr('common.unknown') }}{% endif %}
+          </td>
+          <td>{{ '%g'|format(t.sms) if t.sms is not none else tr('common.unknown') }}</td>
+          <td>
+            {% if t.name == current_tariff %}
+            <span class="muted">{{ tr('action.in_use') }}</span>
+            {% else %}
+            <form method="post" action="{{ url_for('customer.change_tariff') }}" class="inline-form"
+                  onsubmit="return confirm('{{ tr('action.switch_confirm', name=t.name) }}');">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <input type="hidden" name="tariff" value="{{ t.name }}">
+              <button class="btn btn-ghost btn-sm" type="submit">{{ tr('action.switch') }}</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="footnote">{{ tr('recs.change_foot_1') }} <code>tariff_changes</code> {{ tr('recs.change_foot_2') }}</p>
+</section>
+{% endblock %}

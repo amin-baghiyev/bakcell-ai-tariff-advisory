@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} · Tariff Advisor{% endblock %}
+{% block bottomnav %}{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <h1>{{ code }}</h1>
+    <p>{{ message }}</p>
+    <a class="btn btn-primary btn-block" href="{{ url_for('auth.index') }}">{{ tr('error.back') }}</a>
+  </div>
+</div>
+{% endblock %}

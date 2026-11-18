@@ -1,0 +1,8 @@
+# Tariff Advisor — runtime dependencies (Python 3.11+)
+flask>=3.0
+pandas>=2.0
+numpy>=1.26
+scikit-learn>=1.4
+openpyxl>=3.1
+# optional (Windows timezone data for Asia/Baku; app falls back gracefully)
+tzdata; sys_platform == "win32"

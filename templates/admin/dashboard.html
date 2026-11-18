@@ -1,0 +1,235 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ tr('page.business') }} · Admin{% endblock %}
+
+{% block content %}
+<section class="page-head">
+  <h1>{{ tr('page.business') }}</h1>
+  <p class="muted">{{ tr('admin.dash_lede_1') }}
+  <code>results/evaluation_report.md</code>{{ tr('admin.dash_lede_2') }}</p>
+</section>
+
+{# ---------- filters ---------- #}
+<form class="filter-bar" method="get" aria-label="{{ tr('admin.filters_aria') }}">
+  <label>{{ tr('filter.from') }}
+    <input type="month" name="month_from" value="{{ f.month_from or '' }}"
+           min="{{ dash.filters.months_available[0] if dash.filters.months_available else '' }}"
+           max="{{ dash.filters.months_available[-1] if dash.filters.months_available else '' }}">
+  </label>
+  <label>{{ tr('filter.to') }}
+    <input type="month" name="month_to" value="{{ f.month_to or '' }}"
+           min="{{ dash.filters.months_available[0] if dash.filters.months_available else '' }}"
+           max="{{ dash.filters.months_available[-1] if dash.filters.months_available else '' }}">
+  </label>
+  <label>{{ tr('filter.tariff') }}
+    <select name="tariff">
+      <option value="">{{ tr('filter.all_tariffs') }}</option>
+      {% for t in tariffs %}
+      <option value="{{ t }}" {% if f.tariff == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button class="btn btn-primary" type="submit">{{ tr('action.apply') }}</button>
+  <a class="btn btn-ghost" href="{{ url_for('admin.dashboard') }}">{{ tr('action.reset') }}</a>
+</form>
+
+{# ---------- summary cards ---------- #}
+<section class="stat-grid" aria-label="{{ tr('admin.summary_aria') }}">
+  <article class="stat-card">
+    <h2>{{ tr('stat.total_customers') }}</h2>
+    <p class="stat-num">{{ dash.total_customers }}</p>
+    <p class="footnote">{{ tr('admin.tariff_eq', t=f.tariff) if f.tariff else tr('admin.all_tariffs') }}</p>
+  </article>
+
+  <article class="stat-card">
+    <h2>{{ tr('stat.over_allowance') }}</h2>
+    {% if dash.usage.available %}
+    <p class="stat-num">{{ dash.over_allowance.count }} <span class="stat-sub">/ {{ dash.usage.customers }}</span></p>
+    <p class="footnote">{{ tr('admin.foot_over', a=dash.usage.data_exceed_rows, b=dash.usage.rows) }}</p>
+    {% if dash.over_allowance.unknown_utilization %}
+    <p class="footnote">{{ tr('admin.foot_unknown_util', n=dash.over_allowance.unknown_utilization) }}</p>
+    {% endif %}
+    {% else %}
+    <p class="stat-empty">{{ tr('common.unavailable') }} — {{ dash.usage.reason }}</p>
+    {% endif %}
+  </article>
+
+  <article class="stat-card">
+    <h2>{{ tr('stat.avg_spend') }}</h2>
+    {% if dash.usage.avg_spend is not none %}
+    <p class="stat-num">{{ '%g'|format(dash.usage.avg_spend) }} <span class="stat-sub">AZN</span></p>
+    <p class="footnote">{{ tr('admin.foot_records', n=dash.usage.rows) }}</p>
+    {% else %}
+    <p class="stat-empty">{{ tr('admin.unavail_no_rows') }}</p>
+    {% endif %}
+  </article>
+
+  <article class="stat-card">
+    <h2>{{ tr('stat.extra_bought') }}</h2>
+    {% if dash.spend_breakdown %}
+    <p class="stat-num">{{ dash.spend_breakdown.extra_gb }} <span class="stat-sub">GB</span></p>
+    {% if dash.spend_breakdown.unit_prices_known %}
+    <p class="footnote">≈ {{ '%g'|format(dash.spend_breakdown.extra_cost) }} AZN {{ tr('admin.at_catalog') }}</p>
+    {% else %}
+    <p class="footnote">{{ tr('admin.foot_unit_unknown') }}</p>
+    {% endif %}
+    {% else %}
+    <p class="stat-empty">{{ tr('admin.unavail_no_rows') }}</p>
+    {% endif %}
+  </article>
+
+  <article class="stat-card">
+    <h2>{{ tr('stat.utilization_avg') }}</h2>
+    {% if dash.avg_utilization.available and dash.avg_utilization.data_pct is not none %}
+    <p class="stat-num">{{ '%g'|format(dash.avg_utilization.data_pct) }}<span class="stat-sub">{{ tr('unit.pct_data') }}</span></p>
+    {% if dash.avg_utilization.minutes_pct is not none %}
+    <p class="footnote">{{ tr('admin.foot_min_util', n='%g'|format(dash.avg_utilization.minutes_pct)) }}</p>
+    {% endif %}
+    {% if dash.avg_utilization.unknown_data_rows %}
+    <p class="footnote">{{ tr('admin.foot_unknown_customers', n=dash.avg_utilization.unknown_data_rows) }}</p>
+    {% endif %}
+    {% else %}
+    <p class="stat-empty">{{ tr('admin.unavail_filter') }}</p>
+    {% endif %}
+  </article>
+
+  <article class="stat-card">
+    <h2>{{ tr('stat.addon') }}</h2>
+    {% if dash.spend_breakdown and dash.spend_breakdown.unit_prices_known %}
+    <p class="stat-num">{{ '%g'|format(dash.spend_breakdown.addon_cost) }} <span class="stat-sub">AZN</span></p>
+    <p class="footnote">{{ tr('admin.addon_split',
+      extra='%g'|format(dash.spend_breakdown.extra_cost),
+      oob='%g'|format(dash.spend_breakdown.oob_cost),
+      roam='%g'|format(dash.spend_breakdown.roaming_cost)) }}</p>
+    {% elif dash.spend_breakdown %}
+    <p class="stat-empty">{{ tr('admin.stat_prices_missing') }}</p>
+    {% else %}
+    <p class="stat-empty">{{ tr('admin.unavail_no_rows_short') }}</p>
+    {% endif %}
+  </article>
+</section>
+
+{# ---------- charts ---------- #}
+<section class="chart-grid">
+  <article class="chart-card">
+    <h2>{{ tr('chart.tariff_dist') }}</h2>
+    {% if dash.tariff_distribution %}
+    <ul class="bars">
+      {% set maxn = dash.tariff_distribution[0].n %}
+      {% for row in dash.tariff_distribution %}
+      <li class="bar-row">
+        <span class="bar-label">{{ row.name }}</span>
+        <span class="bar-track"><span class="bar-fill" style="width: {{ (row.n / maxn * 100) | round }}%"></span></span>
+        <span class="bar-value">{{ row.n }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="stat-empty">{{ tr('admin.no_customers') }}</p>
+    {% endif %}
+  </article>
+
+  <article class="chart-card">
+    <h2>{{ tr('chart.usage_vs') }}</h2>
+    {% if dash.usage.available %}
+    <ul class="bars">
+      <li class="bar-row">
+        <span class="bar-label">{{ tr('bar.within_data') }}</span>
+        <span class="bar-track"><span class="bar-fill" style="width: {{ 100 - dash.usage.data_exceed_pct }}%"></span></span>
+        <span class="bar-value">{{ dash.usage.rows - dash.usage.data_exceed_rows }}/{{ dash.usage.rows }}</span>
+      </li>
+      <li class="bar-row">
+        <span class="bar-label">{{ tr('bar.over_data') }}</span>
+        <span class="bar-track"><span class="bar-fill warn" style="width: {{ dash.usage.data_exceed_pct }}%"></span></span>
+        <span class="bar-value">{{ dash.usage.data_exceed_rows }}/{{ dash.usage.rows }} ({{ dash.usage.data_exceed_pct }}%)</span>
+      </li>
+      <li class="bar-row">
+        <span class="bar-label">{{ tr('bar.over_min') }}</span>
+        <span class="bar-track"><span class="bar-fill warn" style="width: {{ dash.usage.minute_exceed_pct }}%"></span></span>
+        <span class="bar-value">{{ dash.usage.minute_exceed_rows }}/{{ dash.usage.rows }} ({{ dash.usage.minute_exceed_pct }}%)</span>
+      </li>
+      <li class="bar-row">
+        <span class="bar-label">{{ tr('bar.bought_extra') }}</span>
+        <span class="bar-track"><span class="bar-fill alt" style="width: {{ (dash.usage.extra_buyer_rows / dash.usage.rows * 100) | round }}%"></span></span>
+        <span class="bar-value">{{ dash.usage.extra_buyer_rows }}/{{ dash.usage.rows }}</span>
+      </li>
+    </ul>
+    <p class="footnote">{{ tr('admin.window_label', a=dash.usage.months[0], b=dash.usage.months[-1]) }}</p>
+    {% else %}
+    <p class="stat-empty">{{ tr('common.unavailable') }} — {{ dash.usage.reason }}</p>
+    {% endif %}
+  </article>
+
+  <article class="chart-card">
+    <h2>{{ tr('chart.rec_dist') }}</h2>
+    {% if dash.recommendation_distribution %}
+    <ul class="bars">
+      {% set maxr = dash.recommendation_distribution[0].n %}
+      {% for row in dash.recommendation_distribution %}
+      <li class="bar-row">
+        <span class="bar-label">{{ row.name or tr('common.unknown') }}</span>
+        <span class="bar-track"><span class="bar-fill" style="width: {{ (row.n / maxr * 100) | round }}%"></span></span>
+        <span class="bar-value">{{ row.n }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    <a class="text-link" href="{{ url_for('admin.customers') }}">{{ tr('admin.see_table') }}</a>
+    {% else %}
+    <p class="stat-empty">{{ tr('admin.no_snap_1') }}
+      <code>python scripts/generate_recommendations.py</code>{{ tr('admin.no_snap_2') }}</p>
+    {% endif %}
+  </article>
+</section>
+
+{# ---------- unsupported metrics ---------- #}
+<section class="unsupported" aria-labelledby="unsup-title">
+  <h2 id="unsup-title">{{ tr('admin.unsup_title') }}</h2>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead><tr><th scope="col">{{ tr('th.metric') }}</th><th scope="col">{{ tr('th.status') }}</th><th scope="col">{{ tr('th.reason') }}</th></tr></thead>
+      <tbody>
+        {% for u in dash.unsupported %}
+        <tr>
+          <th scope="row">{{ u.name }}</th>
+          <td><span class="pill pill-warn">{{ u.status }}</span></td>
+          <td class="reason-cell">{{ u.reason }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ---------- catalog ---------- #}
+<section class="unsupported" aria-labelledby="cat-title">
+  <h2 id="cat-title">{{ tr('admin.catalog_title') }}</h2>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">{{ tr('th.tariff') }}</th><th scope="col">{{ tr('th.family') }}</th><th scope="col">{{ tr('th.price_azn') }}</th>
+          <th scope="col">{{ tr('th.internet_gb') }}</th><th scope="col">{{ tr('th.allnet') }}</th>
+          <th scope="col">{{ tr('th.onnet') }}</th><th scope="col">{{ tr('th.offnet') }}</th><th scope="col">{{ tr('th.sms') }}</th>
+          <th scope="col">{{ tr('th.unlimited_apps') }}</th><th scope="col">{{ tr('th.provenance') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in dash.catalog %}
+        <tr>
+          <th scope="row">{{ t.name }}</th>
+          <td>{{ t.family or '—' }}</td>
+          <td>{{ '%g'|format(t.price_azn) if t.price_azn is not none else tr('common.unknown') }}</td>
+          <td>{{ '%g'|format(t.data_gb) if t.data_gb is not none else tr('common.unknown') }}</td>
+          <td>{{ t.allnet_min if t.allnet_min is not none else tr('common.unknown') }}</td>
+          <td>{{ t.onnet_min if t.onnet_min is not none else tr('common.unknown') }}</td>
+          <td>{{ t.offnet_min if t.offnet_min is not none else tr('common.unknown') }}</td>
+          <td>{{ t.sms if t.sms is not none else tr('common.unknown') }}</td>
+          <td>{{ t.unlimited_apps if t.unlimited_apps else tr('common.unknown') }}</td>
+          <td class="footnote">{{ t.source }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="footnote">{{ tr('admin.cat_foot_1') }} <code>Paketlər</code> {{ tr('admin.cat_foot_2') }}</p>
+</section>
+{% endblock %}

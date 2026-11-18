@@ -1,0 +1,107 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ profile.customer_id }} · Admin{% endblock %}
+
+{% block content %}
+<nav class="crumbs" aria-label="{{ tr('admin.aria_crumbs') }}">
+  <a href="{{ url_for('admin.customers') }}">{{ tr('page.customers') }}</a> / <span>{{ profile.customer_id }}</span>
+</nav>
+
+<section class="page-head">
+  <h1>{{ profile.customer_id }}</h1>
+  <p class="muted">{{ tr('admin.detail_lede',
+      tariff=profile.current_tariff, region=profile.region,
+      type=profile.subscriber_type, tenure=profile.tenure_months) }}
+    <strong>{{ tr('admin.not_stored') }}</strong></p>
+</section>
+
+<section class="stat-grid">
+  <article class="stat-card">
+    <h2>{{ tr('stat.current_plan') }}</h2>
+    <p class="stat-num">{{ profile.current_tariff }}</p>
+    <p class="footnote">{{ '%g'|format(profile.price_azn) }} {{ tr('unit.azn_mo') }} ·
+      {{ '%g'|format(profile.plan_data_gb) }} GB ·
+      {{ profile.plan_allnet_min or ((profile.plan_onnet_min or 0) + (profile.plan_offnet_min or 0)) }} min</p>
+  </article>
+  <article class="stat-card">
+    <h2>{{ tr('stat.averages_6m') }}</h2>
+    <p class="stat-num">{{ '%g'|format(profile.avg_data_gb) }} <span class="stat-sub">GB</span></p>
+    <p class="footnote">{{ '%g'|format(profile.avg_minutes) }} min · {{ '%g'|format(profile.avg_spend_azn) }} {{ tr('unit.azn_spend') }}</p>
+  </article>
+  <article class="stat-card">
+    <h2>{{ tr('stat.utilization') }}</h2>
+    <p class="stat-num">
+      {% if profile.data_utilization is not none %}
+        {{ '%.0f'|format(profile.data_utilization * 100) }}<span class="stat-sub">{{ tr('unit.pct_data') }}</span>
+      {% else %}<span class="stat-empty">{{ tr('common.unknown') }}</span>{% endif %}
+    </p>
+    <p class="footnote">{{ ('%.0f'|format(profile.minute_utilization * 100)) if profile.minute_utilization else tr('common.unknown') }}{{ tr('unit.pct_minutes') }}</p>
+  </article>
+  <article class="stat-card">
+    <h2>{{ tr('stat.extra_6m') }}</h2>
+    <p class="stat-num">{{ profile.extra_gb_6m }} <span class="stat-sub">GB</span></p>
+    <p class="footnote">{{ tr('admin.renewal_label') }} {{ profile.tariff_end_date or tr('common.missing_in_source') }}</p>
+  </article>
+</section>
+
+{% if rec %}
+<section class="table-card">
+  <h2>{{ tr('admin.latest_rec') }} <span class="footnote">{{ rec.generated_at }} · {{ rec.model_version }}</span></h2>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr><th scope="col">{{ tr('th.rank') }}</th><th scope="col">{{ tr('th.plan') }}</th><th scope="col">{{ tr('spec.score') }}</th>
+            <th scope="col">{{ tr('spec.est_cost') }}</th><th scope="col">{{ tr('th.data_cover') }}</th>
+            <th scope="col">{{ tr('th.calls_cover') }}</th><th scope="col">{{ tr('th.reasons') }}</th></tr>
+      </thead>
+      <tbody>
+        {% for plan in rec.ranked %}
+        <tr class="{{ 'row-current' if plan.is_current }}">
+          <td>{{ loop.index }}</td>
+          <th scope="row">{{ plan.name }} {% if plan.is_current %}<span class="pill pill-current">{{ tr('pill.current') }}</span>{% endif %}</th>
+          <td>{{ '%.3f'|format(plan.score) if plan.score is not none else 'n/a' }}</td>
+          <td>{{ '%g'|format(plan.est_total_cost) if plan.est_total_cost is not none else tr('common.unknown') }}</td>
+          <td>{{ '%.0f'|format(plan.adequacy_data * 100) ~ '%' if plan.adequacy_data is not none else tr('common.unknown') }}</td>
+          <td>{{ '%.0f'|format(plan.adequacy_calls * 100) ~ '%' if plan.adequacy_calls is not none else tr('common.unknown') }}</td>
+          <td class="reason-cell">{{ reasons(plan.reason_codes) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="footnote">{{ tr('admin.window_foot', a=rec.window_start, b=rec.window_end, w=rec.weights) }}</p>
+</section>
+{% else %}
+<section class="table-card"><p class="stat-empty">{{ tr('admin.no_snap_customer') }}</p></section>
+{% endif %}
+
+<section class="table-card">
+  <h2>{{ tr('admin.monthly_usage') }}</h2>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">{{ tr('th.month') }}</th><th scope="col">{{ tr('th.tariff') }}</th><th scope="col">{{ tr('th.data') }}</th>
+          <th scope="col">{{ tr('th.minutes') }}</th><th scope="col">{{ tr('th.extra_gb') }}</th>
+          <th scope="col">{{ tr('th.oob') }}</th><th scope="col">{{ tr('th.topups') }}</th>
+          <th scope="col">{{ tr('th.roaming') }}</th><th scope="col">{{ tr('th.spend') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in history %}
+        <tr>
+          <th scope="row">{{ h.month }}</th>
+          <td>{{ h.tariff }}</td>
+          <td>{{ '%g'|format(h.data_gb) }}</td>
+          <td>{{ h.total_minutes }}</td>
+          <td>{{ h.extra_gb }}</td>
+          <td>{{ h.out_of_bundle_min }}</td>
+          <td>{{ h.topup_count }}</td>
+          <td>{{ h.roaming_days }}</td>
+          <td>{{ '%g'|format(h.spend_azn) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

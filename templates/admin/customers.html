@@ -1,0 +1,80 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ tr('page.customers') }} · Admin{% endblock %}
+
+{% block content %}
+<section class="page-head">
+  <h1>{{ tr('admin.customers_h1') }}</h1>
+  <p class="muted">{{ tr('admin.customers_lede') }}</p>
+</section>
+
+<form class="filter-bar" method="get" aria-label="{{ tr('admin.cust_filters_aria') }}">
+  <label>{{ tr('filter.search_id') }}
+    <input type="search" name="q" value="{{ search or '' }}" placeholder="BKC-0001">
+  </label>
+  <label>{{ tr('filter.tariff') }}
+    <select name="tariff">
+      <option value="">{{ tr('filter.all_tariffs') }}</option>
+      {% for t in tariffs %}
+      <option value="{{ t }}" {% if f.tariff == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button class="btn btn-primary" type="submit">{{ tr('action.filter') }}</button>
+  <a class="btn btn-ghost" href="{{ url_for('admin.customers') }}">{{ tr('action.reset') }}</a>
+</form>
+
+<section class="table-card">
+  <p class="footnote">{{ tr('admin.table_counts', n=table.total, p=table.page, P=table.pages) }}</p>
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">{{ tr('th.customer_id') }}</th>
+          <th scope="col">{{ tr('th.current_tariff') }}</th>
+          <th scope="col">{{ tr('th.current_price') }}</th>
+          <th scope="col">{{ tr('th.rec_tariff') }}</th>
+          <th scope="col">{{ tr('th.rec_price') }}</th>
+          <th scope="col">{{ tr('th.reason') }}</th>
+          <th scope="col">{{ tr('th.generated') }}</th>
+          <th scope="col"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in table.rows %}
+        <tr>
+          <th scope="row">{{ item.customer_id }}</th>
+          <td>{{ item.current_tariff }}</td>
+          <td>{{ '%g'|format(item.current_price) ~ ' AZN' if item.current_price is not none else '—' }}</td>
+          <td>
+            {% if item.recommended_tariff %}
+              {{ item.recommended_tariff }}
+              {% if item.recommended_tariff == item.current_tariff %}
+              <span class="pill pill-current">{{ tr('action.keep') }}</span>
+              {% endif %}
+            {% else %}<span class="muted">{{ tr('common.no_snapshot') }}</span>{% endif %}
+          </td>
+          <td>{{ '%g'|format(item.recommended_price) ~ ' AZN' if item.recommended_price is not none else '—' }}</td>
+          <td class="reason-cell">{{ item.reason or '—' }}</td>
+          <td class="footnote">{{ item.generated_at or '—' }}</td>
+          <td><a class="text-link" href="{{ url_for('admin.customer_detail', customer_id=item.customer_id) }}">{{ tr('action.detail') }}</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="stat-empty">{{ tr('admin.no_match') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if table.pages > 1 %}
+  <nav class="pager" aria-label="{{ tr('pager.page', p=table.page, P=table.pages) }}">
+    {% if prev_url %}
+    <a class="btn btn-ghost btn-sm" href="{{ prev_url }}">{{ tr('action.prev') }}</a>
+    {% endif %}
+    <span class="footnote">{{ tr('pager.page', p=table.page, P=table.pages) }}</span>
+    {% if next_url %}
+    <a class="btn btn-ghost btn-sm" href="{{ next_url }}">{{ tr('action.next') }}</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}

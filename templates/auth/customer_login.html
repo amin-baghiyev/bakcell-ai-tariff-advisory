@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block header %}{% endblock %}
+{% block bottomnav %}{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="34" height="34"><path d="M6 4 L18 4 L14 12 L24 8 L16 16 L26 18 L14 20 L20 28 L10 22 L6 30 L8 18 Z" fill="currentColor"/></svg>
+      </span>
+      <div>
+        <h1>{{ tr('auth.customer_signin') }}</h1>
+        <p class="muted">{{ tr('auth.customer_sub') }}</p>
+      </div>
+    </div>
+
+    {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+
+    <form method="post" class="stack-form" novalidate>
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next or '' }}">
+      <label for="email">{{ tr('auth.email') }}
+        <input id="email" name="email" type="email" autocomplete="username" required autofocus>
+      </label>
+      <label for="password">{{ tr('auth.password') }}
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <button class="btn btn-primary btn-block" type="submit">{{ tr('auth.signin') }}</button>
+    </form>
+
+    {% if demo_mode and demo_email %}
+    <div class="demo-credentials" role="note">
+      <strong>{{ tr('auth.demo_creds') }}</strong>
+      <dl>
+        <dt>{{ tr('auth.customer') }}</dt><dd><code>{{ demo_email }}</code> / <code>{{ demo_password }}</code></dd>
+        <dt>{{ tr('auth.second_customer') }}</dt><dd><code>customer2@demo.local</code> / <code>Demo-Customer2-2026</code></dd>
+      </dl>
+      <p class="muted">{{ tr('auth.no_admin_here') }}</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

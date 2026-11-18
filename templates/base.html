@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="{{ locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}Tariff Advisor{% endblock %}</title>
+  <meta name="description" content="Demo tariff advisor (synthetic data)">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body class="app-body">
+{% block header %}
+<header class="app-header">
+  <a class="brand" href="{{ url_for('customer.dashboard') }}" aria-label="{{ tr('a11y.home') }}">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="30" height="30" role="img" aria-label="Logo">
+        <path d="M6 4 L18 4 L14 12 L24 8 L16 16 L26 18 L14 20 L20 28 L10 22 L6 30 L8 18 Z" fill="currentColor"/>
+      </svg>
+    </span>
+    <span class="brand-word">bakcell<span class="brand-sub">advisor demo</span></span>
+  </a>
+  <div class="header-actions">
+    <a class="icon-btn" href="{{ url_for('customer.notifications') }}" aria-label="{{ tr('a11y.notifications') }}{% if unread is defined and unread %} ({{ unread }}){% endif %}">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.5L4.5 16h15L18 12.5V9a6 6 0 0 0-6-6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      {% if unread is defined and unread %}<span class="badge-dot" aria-hidden="true">{{ unread }}</span>{% endif %}
+    </a>
+    <form action="{{ url_for('auth.logout') }}" method="post" class="inline-form">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <button class="icon-btn" type="submit" aria-label="{{ tr('a11y.signout') }}">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8M12 12H3m0 0 3-3m-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </form>
+  </div>
+</header>
+{% endblock %}
+
+{% block langbar %}
+<nav class="lang-bar" aria-label="{{ tr('lang.aria') }}">
+  <a href="{{ url_for('auth.set_lang', code='az', next=(request.full_path if request.query_string else request.path)) }}"
+     class="lang-opt {% if locale == 'az' %}is-on{% endif %}" hreflang="az">AZ</a>
+  <span aria-hidden="true">/</span>
+  <a href="{{ url_for('auth.set_lang', code='en', next=(request.full_path if request.query_string else request.path)) }}"
+     class="lang-opt {% if locale == 'en' %}is-on{% endif %}" hreflang="en">EN</a>
+</nav>
+{% endblock %}
+
+{% if demo_mode %}
+<p class="demo-strip" role="note">{{ tr('demo.strip') }}</p>
+{% endif %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-stack" role="status">
+    {% for category, message in messages %}
+    <p class="flash flash-{{ category }}">{{ message }}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+
+<main class="app-main" id="main">
+  {% block content %}{% endblock %}
+</main>
+
+{% block bottomnav %}
+<nav class="bottom-nav" aria-label="{{ tr('nav.home') }}">
+  <a href="{{ url_for('customer.dashboard') }}" class="bottom-item {% if active_nav == 'home' %}is-active{% endif %}">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" fill="currentColor"/></svg>
+    <span>{{ tr('nav.home') }}</span>
+  </a>
+  <a href="{{ url_for('customer.recommendations') }}" class="bottom-item {% if active_nav == 'tariffs' %}is-active{% endif %}">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <span>{{ tr('nav.tariffs') }}</span>
+  </a>
+  <a href="{{ url_for('customer.history') }}" class="bottom-item {% if active_nav == 'history' %}is-active{% endif %}">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    <span>{{ tr('nav.history') }}</span>
+  </a>
+  <a href="{{ url_for('customer.notifications') }}" class="bottom-item {% if active_nav == 'alerts' %}is-active{% endif %}">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.5L4.5 16h15L18 12.5V9a6 6 0 0 0-6-6z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <span>{{ tr('nav.alerts') }}</span>
+    {% if unread is defined and unread %}<span class="badge-dot nav-badge" aria-hidden="true">{{ unread }}</span>{% endif %}
+  </a>
+</nav>
+{% endblock %}
+
+<footer class="app-footer">
+  <small>{{ tr('footer.note') }}</small>
+</footer>
+<script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</body>
+</html>

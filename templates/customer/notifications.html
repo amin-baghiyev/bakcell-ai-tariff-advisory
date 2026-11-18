@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ tr('page.reminders') }} · Tariff Advisor{% endblock %}
+
+{% block content %}
+<section class="page-head">
+  <h1>{{ tr('page.reminders') }}</h1>
+  <p class="muted">{{ tr('notif.lede') }}</p>
+</section>
+
+{# ---------- preferences ---------- #}
+<section class="prefs-card" aria-labelledby="prefs-title">
+  <h2 id="prefs-title">{{ tr('notif.prefs_title') }}</h2>
+  <form action="{{ url_for('customer.notification_preferences') }}" method="post" class="prefs-form">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label class="switch-label" for="in_app">
+      <input type="checkbox" id="in_app" name="in_app" {% if profile.notification_opt_in %}checked{% endif %}
+             onchange="this.form.submit()">
+      <span>{{ tr('notif.in_app_label') }}</span>
+    </label>
+    <p class="footnote">{{ tr('notif.prefs_foot') }}</p>
+  </form>
+</section>
+
+{# ---------- notification list ---------- #}
+<section class="notif-card" aria-labelledby="notif-title">
+  <h2 id="notif-title">{{ tr('notif.your') }}</h2>
+  {% if items %}
+  <ul class="notif-list">
+    {% for n in items %}
+    <li class="notif-item {% if n.status == 'read' %}is-read{% endif %}">
+      <div class="notif-body">
+        <strong>{{ tr('notif.type_reminder') if n.type == 'tariff_end_reminder' else n.type }}</strong>
+        <p>{{ notif_text(n) }}</p>
+        <p class="footnote">
+          {{ tr('notif.meta', key=n.period_key, status=tr('notif.status_' ~ n.status)) }}
+          {% if n.due_at %} · {{ tr('notif.due', at=n.due_at) }}{% endif %}
+        </p>
+      </div>
+      {% if n.status != 'read' %}
+      <form action="{{ url_for('customer.mark_read', nid=n.id) }}" method="post" class="inline-form">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="btn btn-ghost btn-sm" type="submit">{{ tr('action.mark_read') }}</button>
+      </form>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty-state">
+    <p><strong>{{ tr('notif.empty_title') }}</strong></p>
+    <p class="muted">{{ tr('notif.empty_body', w=reminder_window) }}</p>
+    <p class="muted">{{ tr('notif.trigger') }} <code>python scripts/run_reminders.py</code></p>
+  </div>
+  {% endif %}
+</section>
+
+{# ---------- skip log (transparency about missing data) ---------- #}
+<section class="notif-card" aria-labelledby="skip-title">
+  <h2 id="skip-title">{{ tr('notif.skips_title') }}</h2>
+  {% if skips %}
+  <ul class="skip-list">
+    {% for s in skips %}
+    <li><code>{{ s.customer_id or '—' }}</code> · {{ s.period_key or tr('notif.no_period') }} ·
+        <strong>{{ tr('skip.' ~ s.reason) }}</strong> <span class="footnote">({{ s.created_at }})</span></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">{{ tr('notif.no_skips') }}</p>
+  {% endif %}
+</section>
+
+<p class="footnote">{{ tr('notif.tz_foot') }}</p>
+{% endblock %}

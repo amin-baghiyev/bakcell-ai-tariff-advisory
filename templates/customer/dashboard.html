@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% set p = data.profile %}
+{% set avg = data.averages %}
+{% set rec = data.recommendation %}
+{% set prices = data.unit_prices %}
+
+{% block title %}{{ tr('page.home') }} · Tariff Advisor{% endblock %}
+
+{% block content %}
+{# ---------- five-day reminder banner (in-app demo) ---------- #}
+{% if reminder %}
+<section class="reminder-banner" role="status">
+  <span class="reminder-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3a6 6 0 0 0-6 6v3.5L4.5 16h15L18 12.5V9a6 6 0 0 0-6-6z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+  </span>
+  <div>
+    <strong>{{ tr('dash.reminder_title') }}</strong>
+    <p>{{ notif_text(reminder) }}</p>
+    <a class="text-link" href="{{ url_for('customer.notifications') }}">{{ tr('dash.open_reminders') }}</a>
+  </div>
+</section>
+{% endif %}
+
+{# ---------- current tariff summary (dark red card) ---------- #}
+<section class="sim-card" aria-label="{{ tr('dash.current_aria') }}">
+  <div class="sim-card-shapes" aria-hidden="true"></div>
+  <div class="sim-card-top">
+    <div>
+      <span class="sim-label">{{ tr('dash.current_tariff') }}</span>
+      <h1 class="sim-title">{{ p.current_tariff }}</h1>
+      <p class="sim-sub">{{ '%g'|format(p.price_azn) }} ₼ {{ tr('unit.per_month') }} ·
+        {% if p.months_on_tariff %}{{ tr('dash.months_with_plan', n=p.months_on_tariff) }}
+        {% else %}{{ tr('dash.switched_recently') }}{% endif %}</p>
+    </div>
+  </div>
+
+  <div class="sim-chips">
+    <span class="sim-chip"><strong>{{ '%g'|format(p.plan_data_gb) }}</strong> GB</span>
+    <span class="sim-chip"><strong>{{ '%g'|format((p.plan_allnet_min or 0) or ((p.plan_onnet_min or 0) + (p.plan_offnet_min or 0))) }}</strong> min</span>
+    <span class="sim-chip"><strong>{{ '%g'|format(p.plan_sms) }}</strong> SMS</span>
+  </div>
+
+  <div class="sim-foot">
+    <div>
+      <span class="sim-foot-label">{{ tr('dash.avg_spend') }}</span>
+      <span class="sim-foot-value">{{ '%g'|format(p.avg_spend_azn) }} ₼</span>
+    </div>
+    <div>
+      <span class="sim-foot-label">{{ tr('dash.renewal') }}</span>
+      <span class="sim-foot-value">
+        {% if p.tariff_end_date %}{{ p.tariff_end_date }}{% else %}<em class="unknown">{{ tr('common.not_in_source') }}</em>{% endif %}
+      </span>
+    </div>
+  </div>
+  {% if p.tariff_end_source == 'demo_mock' %}
+  <p class="sim-note">{{ tr('dash.mock_1') }} <strong>{{ tr('dash.mock_word') }}</strong> {{ tr('dash.mock_2') }}</p>
+  {% endif %}
+</section>
+
+{# ---------- quick tiles ---------- #}
+<nav class="tile-row" aria-label="{{ tr('dash.quick_aria') }}">
+  <a class="tile" href="{{ url_for('customer.recommendations') }}">
+    <span class="tile-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 6h14M5 12h14M5 18h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+    <span>{{ tr('dash.my_tariff') }}</span>
+  </a>
+  <a class="tile" href="{{ url_for('customer.history') }}">
+    <span class="tile-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 19V9m7 10V5m7 14v-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+    <span>{{ tr('dash.usage') }}</span>
+  </a>
+  <a class="tile" href="{{ url_for('customer.notifications') }}">
+    <span class="tile-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 3a6 6 0 0 0-6 6v3.5L4.5 16h15L18 12.5V9a6 6 0 0 0-6-6z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+    <span>{{ tr('dash.reminders') }}</span>
+  </a>
+  <a class="tile tile-accent" href="{{ url_for('customer.recommendations') }}#compare">
+    <span class="tile-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M7 7h10M7 12h6M7 17h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+    <span>{{ tr('dash.compare') }}</span>
+  </a>
+</nav>
+
+{# ---------- usage summary ---------- #}
+<section class="usage-card" aria-label="{{ tr('dash.usage_aria') }}">
+  {% for b in usage_bars %}
+  <div class="usage-col">
+    <span class="usage-num">{{ '%g'|format(b.value) }}</span>
+    <span class="usage-unit">{{ b.label }}</span>
+    <div class="bar {% if b.over %}bar-over{% endif %}"><span style="width: {{ b.pct }}%"></span></div>
+    <span class="usage-note">
+      {% if b.allowance %}{{ tr('dash.of_allowance', v='%g'|format(b.allowance), unit=b.unit) }}{% else %}{{ tr('dash.allowance_unknown') }}{% endif %}
+    </span>
+  </div>
+  {% endfor %}
+</section>
+
+{# ---------- extra internet row (credit-debt slot in the screenshot) ---------- #}
+<section class="extra-row" aria-label="{{ tr('dash.extra_aria') }}">
+  <span class="extra-ic" aria-hidden="true">%</span>
+  <span class="extra-label">{{ tr('dash.extra_label', n=avg.months|length) }}</span>
+  <strong class="extra-value">
+    {{ avg.extra_gb_total }} GB
+    {% if prices.extra_1gb_azn %}
+    · ≈{{ '%g'|format(avg.extra_gb_total * prices.extra_1gb_azn) }} ₼
+    {% endif %}
+  </strong>
+</section>
+{% if prices.extra_1gb_azn %}
+<p class="footnote">{{ tr('dash.extra_pack_note', p='%g'|format(prices.extra_1gb_azn)) }}</p>
+{% endif %}
+
+{# ---------- SUGGESTED TARIFFS ROW ---------- #}
+<section class="suggested" aria-labelledby="suggested-title">
+  <div class="section-head">
+    <h2 id="suggested-title">{{ tr('dash.suggested_title') }}</h2>
+    <a class="text-link" href="{{ url_for('customer.recommendations') }}">{{ tr('dash.compare_all') }}</a>
+  </div>
+
+  {% if rec and rec.ranked %}
+  <div class="sug-scroll" role="list">
+    {% for plan in rec.ranked[:3] %}
+    {% set reason = rec.explanation.per_plan[loop.index0].short_reason if rec.explanation.per_plan|length > loop.index0 else '' %}
+    <article class="sug-card {% if plan.is_current %}is-current{% endif %}" role="listitem">
+      <div class="sug-badges">
+        {% if loop.index == 1 and plan.is_current %}
+        <span class="pill pill-best">{{ tr('pill.best_keep') }}</span>
+        {% elif loop.index == 1 %}
+        <span class="pill pill-best">{{ tr('pill.top') }}</span>
+        {% else %}
+        <span class="pill pill-rank">#{{ loop.index }}</span>
+        {% endif %}
+        {% if plan.is_current %}<span class="pill pill-current">{{ tr('pill.current') }}</span>{% endif %}
+      </div>
+      <h3 class="sug-name">{{ plan.name }}</h3>
+      <p class="sug-price"><strong>{{ '%g'|format(plan.price_azn) }} ₼</strong><span>{{ tr('unit.per_month') }}</span></p>
+      <ul class="sug-specs">
+        <li><strong>{{ '%g'|format(plan.data_gb) if plan.data_gb is not none else '?' }}</strong> GB {{ tr('dash.gb_internet') }}</li>
+        {% set tmin = plan.facts.plan_total_min %}
+        <li><strong>{{ '%g'|format(tmin) if tmin is not none else '?' }}</strong> min</li>
+        {% if plan.unlimited_apps and plan.unlimited_apps != 'Yoxdur' %}
+        <li>{{ tr('dash.unlimited') }} {{ plan.unlimited_apps }}</li>
+        {% endif %}
+      </ul>
+      <p class="sug-reason">{{ reason or tr('dash.ranked_fallback') }}</p>
+      {% if plan.shortfall %}
+      <p class="sug-warn">{{ tr('pill.shortfall', v=plan.shortfall) }}</p>
+      {% endif %}
+      <a class="btn btn-ghost btn-block" href="{{ url_for('customer.recommendations') }}#compare">{{ tr('dash.details') }}</a>
+    </article>
+    {% endfor %}
+  </div>
+  <p class="footnote">{{ rec.explanation.disclaimer }}</p>
+  {% else %}
+  <div class="empty-state">
+    <p><strong>{{ tr('dash.no_sugg_title') }}</strong></p>
+    <p class="muted">{{ tr('dash.no_sugg_1') }}
+    <code>python scripts/generate_recommendations.py</code> {{ tr('dash.no_sugg_2') }}</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
